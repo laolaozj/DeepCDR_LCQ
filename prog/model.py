@@ -13,6 +13,7 @@ from layers.graph import GraphLayer,GraphConv
 
 
 class KerasMultiSourceGCNModel(object):
+
     def __init__(self,use_mut,use_gexp,use_methy,regr=True):#
         self.use_mut = use_mut
         self.use_gexp = use_gexp
@@ -22,18 +23,12 @@ class KerasMultiSourceGCNModel(object):
         node_feature = Input(shape=(100,33),name='node_feature')#drug_dim=33
         lcq_adj = Input(shape=(100,100,11),name='lcq_adj')
         # edge_feature=Input(shape=(None,edge_dim),name='edge_feature')
-
         mutation_input = Input(shape=(1,mutation_dim,1),name='mutation_feat_input')
         gexpr_input = Input(shape=(gexpr_dim,),name='gexpr_feat_input')
         methy_input = Input(shape=(methy_dim,),name='methy_feat_input')
         # #drug feature with GCN
 
-        maskmol = node_feature.clamp(0.0, 1.0).unsqueeze(2).float()
-        mask = (maskmol.unsqueeze(1) * maskmol.unsqueeze(2))-K.eye(a2).unsqueeze(0).unsqueeze(3).cuda(
-            mol.device)  # +torch.eye(adj.shape[1]).cuda().unsqueeze(0).unsqueeze(3)*maskmol.unsqueeze(3)
-        mask = mask.clamp(0, 1)
-
-        GCN_layer = GraphConv(units=units_list[0],step_num=1)([node_feature,lcq_adj,edge_feature,mask,maskmol])
+        GCN_layer = GraphConv(units=units_list[0],step_num=1)([node_feature,lcq_adj])
         if use_relu:
             GCN_layer = Activation('relu')(GCN_layer)
         else:
@@ -41,6 +36,26 @@ class KerasMultiSourceGCNModel(object):
         if use_bn:
             GCN_layer = BatchNormalization()(GCN_layer)
         GCN_layer = Dropout(0.1)(GCN_layer)
+
+        for i in range(len(units_list)-1):
+            GCN_layer = GraphConv(units=units_list[i+1], step_num=1)([GCN_layer, lcq_adj])
+            if use_relu:
+                GCN_layer = Activation('relu')(GCN_layer)
+            else:
+                GCN_layer = Activation('tanh')(GCN_layer)
+            if use_bn:
+                GCN_layer = BatchNormalization()(GCN_layer)
+            GCN_layer = Dropout(0.1)(GCN_layer)
+
+        GCN_layer = GraphConv(units=100, step_num=1)([GCN_layer, lcq_adj])
+        if use_relu:
+            GCN_layer = Activation('relu')(GCN_layer)
+        else:
+            GCN_layer = Activation('tanh')(GCN_layer)
+        if use_bn:
+            GCN_layer = BatchNormalization()(GCN_layer)
+        GCN_layer = Dropout(0.1)(GCN_layer)
+
         #global pooling
         if use_GMP:
             x_drug = GlobalMaxPooling1D()(GCN_layer)
@@ -92,5 +107,7 @@ class KerasMultiSourceGCNModel(object):
             output = Dense(1,name='output')(x)
         else:
             output = Dense(1,activation = 'sigmoid',name='output')(x)
-        model  = Model(inputs=[drug_feat_input,drug_adj_input,mutation_input,gexpr_input,methy_input],outputs=output)  
+        model  = Model(inputs=[drug_feat_input,drug_adj_input,mutation_input,gexpr_input,methy_input],outputs=output)
+        print("????")
+
         return model    
