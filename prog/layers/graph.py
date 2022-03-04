@@ -3,16 +3,20 @@ from __future__ import print_function
 from keras import activations, initializers, constraints
 from keras import regularizers
 from keras.engine import Layer
-import keras.backend as K
-
-
+from  keras.backend.tensorflow_backend import clip
+import tensorflow as tf
+from keras import backend as K
+import numpy as np
+from keras.layers import  Reshape
 import keras
+import tensorflow as tf
+from keras.layers import Dense,Activation,Dropout,Flatten,Concatenate
+from keras.layers import BatchNormalization
+
 
 class GraphLayer(keras.layers.Layer):
 
     def __init__(self,
-                 in_features,
-                 out_features,
                  step_num=1,
                  activation="tanh",
                  **kwargs):
@@ -22,33 +26,15 @@ class GraphLayer(keras.layers.Layer):
         :param activation: The activation function after convolution.
         :param kwargs: Other arguments for parent class.
         """
-        super(GraphLayer, self).__init__(**kwargs)
-
-        self.in_features=in_features
-        self.out_features=out_features
-        self.bn=bn
-        self.tanh=K.tanh()
-        self.relu = K.relu()
-
-        self.weight=(self.in_features, self.out_features)
-        self.bias =(self.out_features)
         self.supports_masking = True
         self.step_num = step_num
-        self.reset_parameters()
-
-        if bn:
-            self.mol_bn1 = keras.layers.BatchNormalization(self.num_head * self.out_features)
-            self.mol_bn2 = keras.layers.BatchNormalization(self.out_features)
-            self.adj_bn1 = keras.layers.BatchNormalization(16)
-            self.adj_bn2 = keras.layers.BatchNormalization(self.num_head)
-        if sn:
-            self.out_linear=SN(nn.Linear(self.out_features*self.num_head, self.out_features))
-        else:
-            self.out_linear=(nn.Linear(self.out_features*self.num_head, self.out_features, bias=True))
-
         self.activation = keras.activations.get(activation)
         self.supports_masking = True
 
+        self.out_features = 33
+        self.num_head = 11
+
+        super(GraphLayer, self).__init__(**kwargs)
 
     def get_config(self):
         config = {
@@ -77,6 +63,7 @@ class GraphConv(GraphLayer):
                  units,
                  kernel_initializer='glorot_uniform',
                  kernel_regularizer=None,
+                 kernel_constraint=None,
                  use_bias=True,
                  bias_initializer='zeros',
                  bias_regularizer=None,
@@ -103,10 +90,7 @@ class GraphConv(GraphLayer):
         self.bias_initializer = keras.initializers.get(bias_initializer)
         self.bias_regularizer = keras.regularizers.get(bias_regularizer)
         self.bias_constraint = keras.constraints.get(bias_constraint)
-
-
-
-        # self.W, self.b = None, None
+        self.W, self.b = None, None
         super(GraphConv, self).__init__(**kwargs)
 
     def get_config(self):
@@ -124,62 +108,162 @@ class GraphConv(GraphLayer):
         return dict(list(base_config.items()) + list(config.items()))
 
     def build(self, input_shape):
+
         feature_dim = input_shape[0][2]
-        self.W = self.add_weight(
+        self.test_W = self.add_weight(
             shape=(feature_dim, self.units),
             initializer=self.kernel_initializer,
             regularizer=self.kernel_regularizer,
             constraint=self.kernel_constraint,
             name='{}_W'.format(self.name),
         )
+        self.adj_linear_W = self.add_weight(
+            shape=(self.out_features*2, self.units),
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            name='{}_W'.format(self.name),
+        )
+        self.adj_out_linear_W = self.add_weight(
+            shape=(self.units+self.num_head, self.num_head),
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            name='{}_W'.format(self.name),
+        )
+        self.out_linear_W = self.add_weight(
+            shape=(feature_dim*self.num_head, self.units),
+            initializer=self.kernel_initializer,
+            regularizer=self.kernel_regularizer,
+            constraint=self.kernel_constraint,
+            name='{}_W'.format(self.name),
+        )
         if self.use_bias:
-            self.b = self.add_weight(
+            self.adj_linear_b = self.add_weight(
                 shape=(self.units,),
                 initializer=self.bias_initializer,
                 regularizer=self.bias_regularizer,
                 constraint=self.bias_constraint,
                 name='{}_b'.format(self.name),
             )
+            self.adj_out_linear_b = self.add_weight(
+                shape=(self.num_head,),
+                initializer=self.bias_initializer,
+                regularizer=self.bias_regularizer,
+                constraint=self.bias_constraint,
+                name='{}_b'.format(self.name),
+            )
+            self.out_linear_b = self.add_weight(
+                shape=(self.units,),
+                initializer=self.bias_initializer,
+                regularizer=self.bias_regularizer,
+                constraint=self.bias_constraint,
+                name='{}_b'.format(self.name),
+            )
+
         super(GraphConv, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
-        return input_shape[0][:2] + (self.units,)
+        print("qweqwead")
+        return input_shape
 
     def call(self, inputs, **kwargs):
-        node_feature, lcq_adj,
-        ,mask,adjmask = inputs
+        node_feature, lcq_adj=inputs
+        lcq_adj=tf.transpose(lcq_adj,(0,3,1,2))
+    
+        a0, a1, a2, a3 = lcq_adj.shape  # batch*channel*sha1*sha2 edj 32   11 100  100
+        m1, m2, m3 = node_feature.shape  # batch*sha1*emb   node     32    100 33
 
-        a0, a1, a2, a3 = edge_feature.shape  # batch*channel*sha1*sha2 edj 11
-        m1, m2, m3 = node_feature.shape  # batch*sha1*emb   node     35
-        assert a2 == a3
+        node_feature_test=node_feature[:,:,0]
+        mask = K.clip(node_feature_test,0.0, 1.0)
+        mask=K.expand_dims(mask,2)
+        adjmask1=K.expand_dims(mask,1)*K.expand_dims(mask,2)
+        test=K.eye(int(m2))
+        adjmask2=K.expand_dims(test,0)
+        adjmask2=K.expand_dims(adjmask2,3)
+        adjmask=adjmask1-adjmask2
+        adjmask = K.clip(adjmask,0, 1)
+        print(adjmask.shape,"adjmask")
 
-        support = K.dot(node_feature.reshape(m1 * m2, m3), self.weight).reshape(m1, m2, self.out_features)
-        output = K.dot(adj.reshape(a0, a1 * a2, a3), support).reshape(a0, a1, a2, self.out_features)+support.unsqueeze(
-            1)
-        assert ((output * (1-mask.unsqueeze(1))).sum() == 0)
-        if self.bias is not None:
-            output = output+self.bias
-        output = self.activation(output.permute(0, 2, 3, 1).reshape(m1, m2, m3 * self.num_head))
-        if self.bn:
-            output = self.mol_bn2(output.reshape(-1, self.out_features)).reshape(m1, m2, self.out_features)
+        # adjmask = (mask.unsqueeze(1) * mask.unsqueeze(2))-K.eye(a2).unsqueeze(0).unsqueeze(3).cuda(
+        #     mol.device)
+        # +torch.eye(adj.shape[1]).cuda().unsqueeze(0).unsqueeze(3)*maskmol.unsqueeze(3)
+        support=K.reshape(node_feature,(m1*m2,m3))
+        support=K.dot(support,self.test_W)
+        support=K.reshape(support,(m1,m2,self.out_features))
+        # support = K.dot(node_feature.reshape(m1 * m2, m3), self.test_W).reshape(m1, m2, self.out_features)
+        output1=K.reshape(lcq_adj,(a0,a1*a2,a3))
+        output1=K.batch_dot(output1,support)
+        output1=K.reshape(output1,(a0,a1,a2,self.out_features))
+        # output1 = K.dot(lcq_adj.reshape(a0, a1 * a2, a3), support).reshape(a0, a1, a2, self.out_features)
+        output2=K.expand_dims(support,1)
+        output=output1+output2
+        print(output.shape,"output1.shape")
+        # test=1-K.expand_dims(mask,1)
+        # output=output*test
+        # res=K.sum(output)
+        # assert ((output * (1-mask.unsqueeze(1))).sum() == 0)
+        # if self.b is not None:
+        #     output = output+self.b
+        output=K.permute_dimensions(output,(0,2,3,1))
+        print(output.shape,"output2.shape")
+        output=K.reshape(output,(m1,m2,m3*self.num_head))
+        print(output.shape,"output3.shape")
+        output=self.activation(output)
+        # output = self.activation(output.permute(0,     2, 3, 1).reshape(m1, m2, m3 * self.num_head))
+        # if self.bn:
+        #     output = self.mol_bn2(output.reshape(-1, self.out_features)).reshape(m1, m2, self.out_features)
         output = output * mask
-        output = self.out_linear(output)
+        # output = self.out_linear(output)
+        output = K.dot(output, self.out_linear_W)
+        if self.use_bias:
+            output += self.out_linear_b
         output = self.activation(output)
-        if self.bn:
-            output = self.mol_bn2(output.reshape(-1, self.out_features)).reshape(m1, m2, self.out_features)
+        # if self.bn:
+        #     output = self.mol_bn2(output.reshape(-1, self.out_features)).reshape(m1, m2, self.out_features)
         output = output * mask
+        print(output.shape,"final outputshape")
 
-        tadj = K.concatenate([output.unsqueeze(1) * K.ones([1, a2, 1, 1]).cuda(output.device),
-                              output.unsqueeze(2) * K.ones([1, 1, a3, 1]).cuda(output.device)], 3)
-        tadj = self.relu(self.adj_linear(tadj))
-        if self.bn:
-            tadj = self.adj_bn1(tadj.reshape(-1, 16)).reshape(a0, a2, a3, 16)
-        tadj = K.concatenate([tadj, adj.permute(0, 2, 3, 1)], 3)
-        _adj = adj
-        adj = self.relu(self.adj_out_linear(tadj))
-        if self.bn:
-            adj = self.adj_bn2(adj.reshape(-1, self.num_head)).reshape(a0, a2, a3, self.num_head)
+
+        tadj = K.concatenate([K.expand_dims(output,1) * K.ones([1, a2, 1, 1]),
+                              K.expand_dims(output,2) * K.ones([1, 1, a3, 1])], 3)
+        # tadj = self.relu(self.adj_linear(tadj))
+        print(tadj.shape, "tadj1")
+        tadj = K.dot(tadj, self.adj_linear_W)
+        if self.use_bias:
+            tadj += self.adj_linear_b
+        tadj=K.relu(tadj)
+        print(tadj.shape, "tadj2")
+        # if self.bn:
+        #     tadj = self.adj_bn1(tadj.reshape(-1, 16)).reshape(a0, a2, a3, 16)
+
+        tadj=K.concatenate([tadj,K.permute_dimensions(lcq_adj,(0,2,3,1))],3)
+        # tadj = K.concatenate([tadj, lcq_adj.permute(0, 2, 3, 1)], 3)
+        print(tadj.shape,"tadj3")
+        _adj = lcq_adj
+
+        # adj = self.relu(self.adj_out_linear(tadj))
+        adj = K.dot(tadj, self.adj_out_linear_W)
+        print(adj.shape,"adj1shape")
+        if self.use_bias:
+            adj += self.adj_out_linear_b
+        adj=K.relu(adj)
+        print(adj.shape,"adj2shape")
         adj = adj * adjmask
-        adj = adj.permute(0, 3, 1, 2)+_adj
-        return [output, adj, mask, adjmask]
+        print(adj.shape,"adj3shape")
+        adj=K.permute_dimensions(adj,(0,3,1,2,))+_adj
+        adj=tf.transpose(adj,(0,2,3,1))
+
+        print(adj.shape,"adjfinalshape")
+
+        act_output = Activation('relu')(output)
+        ba_output = BatchNormalization()(act_output)
+        dr_output = Dropout(0.1)(ba_output)
+
+        act_adj = Activation('relu')(adj)
+        ba_adj = BatchNormalization()(act_adj)
+        dr_adj = Dropout(0.1)(ba_adj)
+
+
+        return [dr_output, dr_adj]
 
