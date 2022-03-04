@@ -20,7 +20,7 @@ class KerasMultiSourceGCNModel(object):
         self.use_methy = use_methy
         self.regr = regr
     def createMaster(self,drug_dim,edge_dim,mutation_dim,gexpr_dim,methy_dim,units_list,use_relu=True,use_bn=True,use_GMP=True):
-        node_feature = Input(shape=(100,33),name='node_feature')#drug_dim=33
+        node_feature = Input(shape=(？,100,33),name='node_feature')#drug_dim=33
         lcq_adj = Input(shape=(100,100,11),name='lcq_adj')
         # edge_feature=Input(shape=(None,edge_dim),name='edge_feature')
         mutation_input = Input(shape=(1,mutation_dim,1),name='mutation_feat_input')
