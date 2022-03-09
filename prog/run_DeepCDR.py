@@ -49,7 +49,7 @@ parser.add_argument('-use_relu', dest='use_relu', type=bool, default=True, help=
 parser.add_argument('-use_GMP', dest='use_GMP', type=bool, help='use GlobalMaxPooling for GCN')
 args = parser.parse_args()
 
-os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+#os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_mut,use_gexp,use_methy = args.use_mut,args.use_gexp, args.use_methy
 israndom=args.israndom
 model_suffix = ('with_mut' if use_mut else 'without_mut')+'_'+('with_gexp' if use_gexp else 'without_gexp')+'_'+('with_methy' if use_methy else 'without_methy')
@@ -65,7 +65,7 @@ TCGA_label_set = ["ALL","BLCA","BRCA","CESC","DLBC","LIHC","LUAD",
 DPATH = '../data'
 Drug_info_file = '%s/GDSC/1.Drug_listMon Jun 24 09_00_55 2019.csv'%DPATH
 Cell_line_info_file = '%s/CCLE/Cell_lines_annotations_20181226.txt'%DPATH
-Drug_feature_file = '%s/GDSC/edge and node feat1'%DPATH
+Drug_feature_file = '%s/GDSC/tmp'%DPATH
 Genomic_mutation_file = '%s/CCLE/genomic_mutation_34673_demap_features.csv'%DPATH
 Cancer_response_exp_file = '%s/CCLE/GDSC_IC50.csv'%DPATH
 Gene_expression_file = '%s/CCLE/genomic_expression_561celllines_697genes_demap_features.csv'%DPATH
@@ -158,6 +158,10 @@ def FeatureExtract(data_idx,drug_feature,mutation_feature,gexpr_feature,methylat
         cell_line_id,pubchem_id,ln_IC50,cancer_type = data_idx[idx]
         #modify
         feat_mat,adj_list,_ = drug_feature[str(pubchem_id)]
+        if idx == 0:
+            print(feat_mat.shape, adj_list.shape)
+            a,b = features_padding(feat_mat,adj_list)
+            print(a.shape, b.shape)
         #fill drug data,padding to the same size with zeros
         drug_data[idx] = features_padding(feat_mat,adj_list)
         #randomlize X A
@@ -183,7 +187,7 @@ class MyCallback(Callback):
         return
     def on_train_end(self, logs={}):
         self.model.set_weights(self.best_weight)
-        self.model.save('../checkpoint/MyBestDeepCDR_%s.h5'%model_suffix)
+        self.model.save('MyBestDeepCDR_%s.h5'%model_suffix)
         if self.stopped_epoch > 0 :
             print('Epoch %05d: early stopping' % (self.stopped_epoch + 1))
         return
@@ -192,7 +196,7 @@ class MyCallback(Callback):
         return
 
     def on_epoch_end(self, epoch, logs={}):
-        y_pred_val = self.model.predict(self.x_val)
+        y_pred_val = self.model.predict(self.x_val, batch_size=1)
         pcc_val = pearsonr(self.y_val, y_pred_val[:,0])[0]
         print('pcc-val: %s' % str(round(pcc_val,4)))
         if pcc_val > self.best:
@@ -213,7 +217,7 @@ def ModelTraining(model,X_drug_data_train,X_mutation_data_train,X_gexpr_data_tra
     optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
     model.compile(optimizer = optimizer,loss='mean_squared_error',metrics=['mse'])
     #EarlyStopping(monitor='val_loss',patience=5)
-    callbacks = [ModelCheckpoint('../checkpoint/best_DeepCDR_%s.h5'%model_suffix,monitor='val_loss',save_best_only=False, save_weights_only=False),
+    callbacks = [ModelCheckpoint('best_DeepCDR_%s.h5'%model_suffix,monitor='val_loss',save_best_only=False, save_weights_only=False),
                 MyCallback(validation_data=validation_data,patience=10)]
     X_drug_feat_data_train = [item[0] for item in X_drug_data_train]
     X_drug_adj_data_train = [item[1] for item in X_drug_data_train]
@@ -230,7 +234,7 @@ def ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,
     X_drug_adj_data_test = [item[1] for item in X_drug_data_test]
     X_drug_feat_data_test = np.array(X_drug_feat_data_test)#nb_instance * Max_stom * feat_dim
     X_drug_adj_data_test = np.array(X_drug_adj_data_test)#nb_instance * Max_stom * Max_stom    
-    Y_pred = model.predict([X_drug_feat_data_test,X_drug_adj_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test])
+    Y_pred = model.predict([X_drug_feat_data_test,X_drug_adj_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test],batch_size=1)
     overall_pcc = pearsonr(Y_pred[:,0],Y_test)[0]
     print("The overall Pearson's correlation is %.4f."%overall_pcc)
     
@@ -238,6 +242,7 @@ def ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,
 def main():
     random.seed(0)
     mutation_feature, drug_feature,gexpr_feature,methylation_feature, data_idx = MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Gene_expression_file,Methylation_file,False)
+    data_idx = data_idx[:100]
     data_train_idx,data_test_idx = DataSplit(data_idx)
 
     #Extract features for training and test 
@@ -253,8 +258,9 @@ def main():
 
     validation_data = [[X_drug_feat_data_test,X_drug_adj_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test],Y_test]
     model = KerasMultiSourceGCNModel(use_mut,use_gexp,use_methy).createMaster(X_drug_data_train[0][0].shape[-1],X_drug_data_train[0][1].shape[-1],X_mutation_data_train.shape[-2],X_gexpr_data_train.shape[-1],X_methylation_data_train.shape[-1],args.unit_list,args.use_relu,args.use_bn,args.use_GMP)
+    print(model.summary())
     print('Begin training...')
-    model = ModelTraining(model,X_drug_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train,Y_train,validation_data,nb_epoch=500)
+    model = ModelTraining(model,X_drug_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train,Y_train,validation_data,nb_epoch=2)
     ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test,Y_test,cancer_type_test_list,'%s/DeepCDR_%s.log'%(DPATH,model_suffix))
 
 if __name__=='__main__':

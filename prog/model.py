@@ -9,7 +9,7 @@ from keras.layers import Dropout,GlobalMaxPooling1D,GlobalAveragePooling1D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.regularizers import l2
-from layers.graph import GraphLayer,GraphConv
+from layers.graph import GraphLayer,GraphConv,GraphConvTest
 
 
 class KerasMultiSourceGCNModel(object):
@@ -21,56 +21,44 @@ class KerasMultiSourceGCNModel(object):
         self.regr = regr
 
     def createMaster(self,drug_dim,edge_dim,mutation_dim,gexpr_dim,methy_dim,units_list,use_relu=True,use_bn=True,use_GMP=True):
-        node_feature = Input(batch_shape=(1,100,drug_dim),name='node_feature')#drug_dim=33
-        lcq_adj = Input(batch_shape=(1,100,100,edge_dim),name='lcq_adj')
+        node_feature = Input(batch_shape=(1,100,drug_dim),name='node_feature')#drug_dim=33 (1,100,33)
+        lcq_adj = Input(batch_shape=(1,100,100,edge_dim),name='lcq_adj') #(1,100,100,11)
         print(lcq_adj.shape,"lcq")
         # edge_feature=Input(shape=(None,edge_dim),name='edge_feature')
-        mutation_input = Input(batch_shape=(1,1,mutation_dim,1),name='mutation_feat_input')
-        gexpr_input = Input(batch_shape=(1,gexpr_dim,),name='gexpr_feat_input')
-        methy_input = Input(batch_shape=(1,methy_dim,),name='methy_feat_input')
+        mutation_input = Input(batch_shape=(1,1,mutation_dim,1),name='mutation_feat_input') #(1, 1, 34673, 1)
+        gexpr_input = Input(batch_shape=(1,gexpr_dim,),name='gexpr_feat_input') #(1, 697)
+        methy_input = Input(batch_shape=(1,methy_dim,),name='methy_feat_input') #(1, 808)
         #drug feature with GCN
 
-        GCN_layer = GraphConv(units=units_list[0],step_num=1)([node_feature,lcq_adj])
+        GCN_layer = GraphConvTest(units=units_list[0])([node_feature,lcq_adj])
 
-        # if use_relu:
-        #     GCN_layer[0] = Activation('relu')(GCN_layer[0])
-        #     GCN_layer[1] = Activation('relu')(GCN_layer[1])
-        # else:
-        #     GCN_layer = Activation('tanh')(GCN_layer)
-        #
-        # if use_bn:
-        #     GCN_layer[0] = BatchNormalization()(GCN_layer[0])
-        #     GCN_layer[1] = BatchNormalization()(GCN_layer[1])
-        #
-        # GCN_layer[0] = Dropout(0.1)(GCN_layer[0])
-        # GCN_layer[1] = Dropout(0.1)(GCN_layer[1])
+        if use_relu:
+            GCN_layer = [Activation('relu')(item) for item in GCN_layer]
+        else:
+            GCN_layer = [Activation('tanh')(item) for item in GCN_layer]
+        if use_bn:
+            GCN_layer = [BatchNormalization()(item) for item in GCN_layer]
+        GCN_layer = [Dropout(0.1)(item) for item in GCN_layer]
 
-        for i in range(len(units_list)-1):
-            GCN_layer = GraphConv(units=units_list[i+1], step_num=1)([GCN_layer[0], GCN_layer[1]])
-            # if use_relu:
-            #     GCN_layer[0] = Activation('relu')(GCN_layer[0])
-            #     GCN_layer[1] = Activation('relu')(GCN_layer[1])
-            # else:
-            #     GCN_layer = Activation('tanh')(GCN_layer)
-        #
-        #     if use_bn:
-        #         GCN_layer[0] = BatchNormalization()(GCN_layer[0])
-        #         GCN_layer[1] = BatchNormalization()(GCN_layer[1])
-        #     GCN_layer[0] = Dropout(0.1)(GCN_layer[0])
-        #     GCN_layer[1] = Dropout(0.1)(GCN_layer[1])
-        #
-        # GCN_layer = GraphConv(units=33, step_num=1)([GCN_layer[0], GCN_layer[1]])
-        # if use_relu:
-        #     GCN_layer[0] = Activation('relu')(GCN_layer[0])
-        #     GCN_layer[1] = Activation('relu')(GCN_layer[1])
-        # else:
-        #     GCN_layer = Activation('tanh')(GCN_layer)
-        #
-        # if use_bn:
-        #     GCN_layer[0] = BatchNormalization()(GCN_layer[0])
-        #     GCN_layer[1] = BatchNormalization()(GCN_layer[1])
-        # GCN_layer[0] = Dropout(0.1)(GCN_layer[0])
-        # GCN_layer[1] = Dropout(0.1)(GCN_layer[1])
+        for i in range(len(units_list)-2):
+            GCN_layer = GraphConvTest(units=units_list[i+1])(GCN_layer)
+            if use_relu:
+                GCN_layer = [Activation('relu')(item) for item in GCN_layer]
+            else:
+                GCN_layer = [Activation('tanh')(item) for item in GCN_layer]
+            if use_bn:
+                GCN_layer = [BatchNormalization()(item) for item in GCN_layer]
+            GCN_layer = [Dropout(0.1)(item) for item in GCN_layer]
+
+        #last layer, do not update edge as it will introduce unused trainable weights.
+        GCN_layer = GraphConvTest(units=units_list[i+1], update_edge=False)(GCN_layer)
+        if use_relu:
+            GCN_layer = [Activation('relu')(item) for item in GCN_layer]
+        else:
+            GCN_layer = [Activation('tanh')(item) for item in GCN_layer]
+        if use_bn:
+            GCN_layer = [BatchNormalization()(item) for item in GCN_layer]
+        GCN_layer = [Dropout(0.1)(item) for item in GCN_layer]
 
         #global pooling
         if use_GMP:
