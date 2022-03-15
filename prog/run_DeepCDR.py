@@ -209,15 +209,16 @@ def ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,
     print("The overall Pearson's correlation is %.4f."%overall_pcc)
 
 def generate_batch_data(data_idx,batch_size,drug_feature,mutation_feature,gexpr_feature,methylation_feature):
-    for step in range(len(data_idx) // batch_size):
-        present_idx = data_idx[step * batch_size:(step+1) * batch_size]
-        X_drug_data_train, X_mutation_data_train, X_gexpr_data_train, X_methylation_data_train, Y_train, cancer_type_train_list \
-            = FeatureExtract(present_idx, drug_feature, mutation_feature, gexpr_feature, methylation_feature)
-        X_drug_feat_data_train = [item[0] for item in X_drug_data_train]
-        X_drug_adj_data_train = [item[1] for item in X_drug_data_train]
-        X_drug_feat_data_train = np.array(X_drug_feat_data_train)#nb_instance * Max_stom * feat_dim
-        X_drug_adj_data_train = np.array(X_drug_adj_data_train)#nb_instance * Max_stom * Max_stom
-        yield [X_drug_feat_data_train,X_drug_adj_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train], Y_train
+    while True:
+        for step in range(len(data_idx) // batch_size):
+            present_idx = data_idx[step * batch_size:(step+1) * batch_size]
+            X_drug_data_train, X_mutation_data_train, X_gexpr_data_train, X_methylation_data_train, Y_train, cancer_type_train_list \
+                = FeatureExtract(present_idx, drug_feature, mutation_feature, gexpr_feature, methylation_feature)
+            X_drug_feat_data_train = [item[0] for item in X_drug_data_train]
+            X_drug_adj_data_train = [item[1] for item in X_drug_data_train]
+            X_drug_feat_data_train = np.array(X_drug_feat_data_train)#nb_instance * Max_stom * feat_dim
+            X_drug_adj_data_train = np.array(X_drug_adj_data_train)#nb_instance * Max_stom * Max_stom
+            yield [X_drug_feat_data_train,X_drug_adj_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train], Y_train
 
 def main():
     random.seed(0)
