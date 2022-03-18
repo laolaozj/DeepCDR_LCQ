@@ -305,14 +305,56 @@ class MolGraphConvFeaturizer(MolecularFeaturizer):
         edge_index=np.asarray([src, dest], dtype=int),
         edge_features=bond_features)
 
+import os
+import deepchem as dc
+import numpy
+from rdkit import Chem
+from tqdm import tqdm
+import torch as t
+import numpy as np
+import hickle as hkl
+import utils
+from tqdm import trange
+
 
 if __name__  == '__main__':
-    mols = ['COC1=C(C=C2C(=C1)CCN=C2C3=CC(=C(C=C3)Cl)Cl)Cl',]
+    mols = ['COC1=C(C=C2C(=C1)CCN=C2C3=CC(=C(C=C3)Cl)Cl)Cl', ]
 
-    graph_featurizer = MolGraphConvFeaturizer(use_edges=True,use_chirality=True,use_partial_charge=True)
+    graph_featurizer = MolGraphConvFeaturizer(use_edges=True, use_chirality=True, use_partial_charge=True)
     graph_mols = graph_featurizer.featurize(mols)
+    # print('node_features', graph_mols[0].node_features.shape)
+    # print('edge_features', graph_mols[0].edge_features.shape)
+    # print('edge_index', graph_mols[0].edge_index.shape)\
+
+    drug_smiles_file = '../data/223drugs_pubchem_smiles.txt'
+    save_dir = '../data/GDSC/drug_graph_feat91and11'
+    pubchemid2smile = {item.split('\t')[0]: item.split('\t')[1].strip() for item in open(drug_smiles_file).readlines()}
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    molecules = []
+    for each in tqdm(pubchemid2smile.keys()):
+        if each=="84691":
+            continue
+        molecules = []
+        molecules.append(Chem.MolFromSmiles(pubchemid2smile[each]))
+        graph_featurizer = MolGraphConvFeaturizer(use_edges=True, use_chirality=True, use_partial_charge=True)
+        graph_mols = graph_featurizer.featurize(molecules)
+
+        node_features = graph_mols[0].node_features
+        edges_attr2 = graph_mols[0].edge_features
+        edges_index = graph_mols[0].edge_index
+        num_nodes=node_features.shape[0]
+
+        adj_np = np.zeros((num_nodes, num_nodes, edges_attr2.shape[1]))
+        index = 0
+        for i in range(0, len(edges_index[0])):
+            adj_np[edges_index[0][i]][edges_index[1][i]] = edges_attr2[index]
+            index += 1
+
+        hkl.dump([node_features, adj_np, edges_attr2], '%s/%s.hkl' % (save_dir, each))
 
 
-    print('node_features',graph_mols[0].node_features.shape)
-    print('edge_features',graph_mols[0].edge_features.shape)
-    print('edge_index',graph_mols[0].edge_index.shape)
+
+
+
+
