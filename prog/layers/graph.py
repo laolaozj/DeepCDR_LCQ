@@ -18,6 +18,7 @@ class GraphConvTest(keras.layers.Layer):
 
     def __init__(self,
                  units,
+                 units_edge,
                  step,
                  kernel_initializer='glorot_uniform',
                  kernel_regularizer=None,
@@ -29,6 +30,7 @@ class GraphConvTest(keras.layers.Layer):
                  bias_constraint=None,
                  **kwargs):
         self.units = units
+        self.units_edge = units_edge
         self.step = step
         self.use_bias = use_bias
         self.activation = keras.activations.get('tanh')
@@ -54,13 +56,13 @@ class GraphConvTest(keras.layers.Layer):
         if self.update_edge:
             self.adj_linear_W = self.add_weight(
                 name = 'w2',
-                shape=( self.units*2, self.units),
+                shape=( self.units*2, self.units_edge),
                 initializer='random_normal',
                 trainable=True
             )
             self.adj_out_linear_W = self.add_weight(
                 name = 'w3',
-                shape=(self.units+edge_dim, edge_dim),
+                shape=(self.units_edge+edge_dim, self.units_edge),
                 initializer='random_normal',
                 trainable=True
             )
@@ -74,7 +76,7 @@ class GraphConvTest(keras.layers.Layer):
             if self.update_edge:
                 self.adj_linear_b = self.add_weight(
                     name = 'b1',
-                    shape=(self.units,),
+                    shape=(self.units_edge,),
                     initializer='random_normal',
                     trainable=True
                 )
@@ -87,7 +89,7 @@ class GraphConvTest(keras.layers.Layer):
         super(GraphConvTest, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
-        res=[input_shape[0][:2]+ (self.units,),input_shape[1]]
+        res=[input_shape[0][:2]+ (self.units,),input_shape[1][:3]+(self.units_edge,)]
         return res
 
 
@@ -136,23 +138,33 @@ class GraphConvTest(keras.layers.Layer):
             tadj = K.concatenate([K.expand_dims(output,1) * K.ones([1, a2, 1, 1]),
                                 K.expand_dims(output,2) * K.ones([1, 1, a3, 1])], 3)
             # tadj = self.relu(self.adj_linear(tadj))
+            print(tadj.shape, " tadj")
             tadj = K.dot(tadj, self.adj_linear_W)
+            print(tadj.shape, " tadj")
             if self.use_bias:
                 tadj += self.adj_linear_b
             tadj=K.relu(tadj)
 
             tadj=K.concatenate([tadj,K.permute_dimensions(lcq_adj,(0,2,3,1))],3)
+            print(tadj.shape, " tadj")
+
             # tadj = K.concatenate([tadj, lcq_adj.permute(0, 2, 3, 1)], 3)
             _adj = lcq_adj
 
             # adj = self.relu(self.adj_out_linear(tadj))
             adj = K.dot(tadj, self.adj_out_linear_W)
+            print(adj.shape, " tadj")
+
             if self.use_bias:
                 adj += self.adj_out_linear_b
             adj=K.relu(adj)
             #adj = adj * adjmask
-            adj=K.permute_dimensions(adj,(0,3,1,2,))+_adj
-            adj=tf.transpose(adj,(0,2,3,1))
+            print(adj.shape, " ??")
+            # print(_adj.shape, " ??")
+            # adj=K.permute_dimensions(adj,(0,3,1,2,))+_adj
+            # print(adj.shape, " ??")
+            #
+            # adj=tf.transpose(adj,(0,2,3,1))
             print(adj.shape,"adjfinalshape")
             return [output, adj]
         else:

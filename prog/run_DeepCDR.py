@@ -11,20 +11,23 @@ import argparse
 
 ####################################Settings#################################
 parser = argparse.ArgumentParser(description='Drug_response_pre')
-parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='0', help='GPU devices')
+parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='3', help='GPU devices')
 parser.add_argument('-use_mut', dest='use_mut', type=bool, default=True, help='use gene mutation or not')
 parser.add_argument('-use_gexp', dest='use_gexp', type=bool , default=True, help='use gene expression or not')
 parser.add_argument('-use_methy', dest='use_methy', type=bool, default=True, help='use methylation or not')
 
 parser.add_argument('-israndom', dest='israndom', type=bool, default=False, help='randomlize X and A')
 #hyparameters for GCN
-parser.add_argument('-unit_list', dest='unit_list', nargs='+', type=int, default=[32,32,32],help='unit list for GCN')
+
+parser.add_argument('-unit_list', dest='unit_list', nargs='+', type=int, default=[128,128,128],help='unit list for GCN')
+parser.add_argument('-unit_edge_list', dest='unit_edge_list', nargs='+', type=int, default=[32,32,32],help='unit list for edge GCN')
+
 parser.add_argument('-use_bn', dest='use_bn', type=bool, default=True, help='use batchnormalization for GCN')
 parser.add_argument('-use_relu', dest='use_relu', type=bool, default=True, help='use relu for GCN')
 parser.add_argument('-use_GMP', dest='use_GMP', type=bool, help='use GlobalMaxPooling for GCN')
 args = parser.parse_args()
 
-#os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 use_mut,use_gexp,use_methy = args.use_mut,args.use_gexp, args.use_methy
 israndom=args.israndom
 model_suffix = ('with_mut' if use_mut else 'without_mut')+'_'+('with_gexp' if use_gexp else 'without_gexp')+'_'+('with_methy' if use_methy else 'without_methy')
@@ -111,11 +114,9 @@ def DataSplit(data_idx,ratio=0.95):
         test_list = [item for item in data_subtype_idx if item not in train_list]
         data_train_idx += train_list
         data_test_idx += test_list
-    print(len(data_test_idx),"qwqwqw")
     assert len(data_test_idx)>=batch_size_set
     num= len(data_test_idx)//batch_size_set
     data_test_idx=data_test_idx[:batch_size_set*num]
-    print(len(data_test_idx),"okoko")
     return data_train_idx,data_test_idx
 
 def features_padding(node_feature,edges_feature,size):
@@ -229,7 +230,7 @@ def generate_batch_data(data_idx,batch_size,drug_feature,mutation_feature,gexpr_
 def main():
     random.seed(0)
     mutation_feature, drug_feature,gexpr_feature,methylation_feature, data_idx = MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Gene_expression_file,Methylation_file,False)
-    # data_idx = data_idx[:100]
+    #data_idx = data_idx[:100]
     data_train_idx,data_test_idx = DataSplit(data_idx)
     #Extract features for training and test
     # X_drug_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train,Y_train,cancer_type_train_list = FeatureExtract(data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature)
@@ -239,7 +240,7 @@ def main():
     X_drug_feat_data_test = np.array(X_drug_feat_data_test)#nb_instance * Max_stom * feat_dim
     X_drug_adj_data_test = np.array(X_drug_adj_data_test)#nb_instance * Max_stom * Max_stom
     validation_data = [[X_drug_feat_data_test,X_drug_adj_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test],Y_test]
-    model = KerasMultiSourceGCNModel(use_mut,use_gexp,use_methy).createMaster(X_drug_data_test[0][0].shape[-1],X_drug_data_test[0][1].shape[-1],X_mutation_data_test.shape[-2],X_gexpr_data_test.shape[-1],X_methylation_data_test.shape[-1],batch_size_set,args.unit_list,args.use_relu,args.use_bn,args.use_GMP)
+    model = KerasMultiSourceGCNModel(use_mut,use_gexp,use_methy).createMaster(X_drug_data_test[0][0].shape[-1],X_drug_data_test[0][1].shape[-1],X_mutation_data_test.shape[-2],X_gexpr_data_test.shape[-1],X_methylation_data_test.shape[-1],batch_size_set,args.unit_list,args.unit_edge_list,args.use_relu,args.use_bn,args.use_GMP)
     # print(model.summary())
     print('Begin training...')
     model = ModelTraining(model,data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature,data_test_idx,validation_data,nb_epoch=epoch_set,batch_size=batch_size_set)
