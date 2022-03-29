@@ -4,6 +4,7 @@
     <content url="file://$MODULE_DIR$" />
     <orderEntry type="jdk" jdkName="Remote Python 3.7.11 (sftp://lcq@10.101.33.2:22/home/lcq/anaconda3/envs/deepcdr/bin/python)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="DeepCDR-master" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="PLAIN" />

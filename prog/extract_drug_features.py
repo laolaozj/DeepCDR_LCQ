@@ -327,7 +327,7 @@ if __name__  == '__main__':
     # print('edge_index', graph_mols[0].edge_index.shape)\
 
     drug_smiles_file = '../data/223drugs_pubchem_smiles.txt'
-    save_dir = '../data/GDSC/drug_graph_feat91and11'
+    save_dir = '../data/GDSC/drug_graph_featnode adjedge adj'
     pubchemid2smile = {item.split('\t')[0]: item.split('\t')[1].strip() for item in open(drug_smiles_file).readlines()}
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -346,12 +346,14 @@ if __name__  == '__main__':
         num_nodes=node_features.shape[0]
 
         adj_np = np.zeros((num_nodes, num_nodes, edges_attr2.shape[1]))
+        adj_np_01=np.zeros((num_nodes, num_nodes, edges_attr2.shape[1]))
         index = 0
         for i in range(0, len(edges_index[0])):
             adj_np[edges_index[0][i]][edges_index[1][i]] = edges_attr2[index]
+            adj_np_01[edges_index[0][i]][edges_index[1][i]] = 1
             index += 1
 
-        hkl.dump([node_features, adj_np, edges_attr2], '%s/%s.hkl' % (save_dir, each))
+        hkl.dump([node_features, adj_np, adj_np_01], '%s/%s.hkl' % (save_dir, each))
 
 
 

@@ -11,7 +11,7 @@ import argparse
 
 ####################################Settings#################################
 parser = argparse.ArgumentParser(description='Drug_response_pre')
-parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='3', help='GPU devices')
+parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='0', help='GPU devices')
 parser.add_argument('-use_mut', dest='use_mut', type=bool, default=True, help='use gene mutation or not')
 parser.add_argument('-use_gexp', dest='use_gexp', type=bool , default=True, help='use gene expression or not')
 parser.add_argument('-use_methy', dest='use_methy', type=bool, default=True, help='use methylation or not')
@@ -43,7 +43,7 @@ TCGA_label_set = ["ALL","BLCA","BRCA","CESC","DLBC","LIHC","LUAD",
 DPATH = '../data'
 Drug_info_file = '%s/GDSC/1.Drug_listMon Jun 24 09_00_55 2019.csv'%DPATH
 Cell_line_info_file = '%s/CCLE/Cell_lines_annotations_20181226.txt'%DPATH
-Drug_feature_file = '%s/GDSC/edge and node feat1'%DPATH
+Drug_feature_file = '%s/GDSC/33 and 11'%DPATH
 Genomic_mutation_file = '%s/CCLE/genomic_mutation_34673_demap_features.csv'%DPATH
 Cancer_response_exp_file = '%s/CCLE/GDSC_IC50.csv'%DPATH
 Gene_expression_file = '%s/CCLE/genomic_expression_561celllines_697genes_demap_features.csv'%DPATH
