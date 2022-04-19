@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="lcq@10.101.33.2:22 (3)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lcq@10.101.4.37:22" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="lcq@10.101.33.2:22">
         <serverdata>
@@ -27,6 +27,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
