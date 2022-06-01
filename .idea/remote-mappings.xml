@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteMappingsManager">
+    <list>
+      <list>
+        <remote-mappings server-id="python@sftp://lcq@10.101.4.37:22/home/lcq/anaconda3/envs/deepcdr/bin/python" />
+      </list>
+    </list>
+  </component>
+</project>

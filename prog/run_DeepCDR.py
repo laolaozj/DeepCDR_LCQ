@@ -8,8 +8,7 @@ from scipy.stats import pearsonr
 from model import KerasMultiSourceGCNModel
 import hickle as hkl
 import argparse
-import scipy.sparse as sp
-
+from keras.utils import multi_gpu_model
 
 ####################################Settings#################################
 parser = argparse.ArgumentParser(description='Drug_response_pre')
@@ -45,19 +44,16 @@ TCGA_label_set = ["ALL","BLCA","BRCA","CESC","DLBC","LIHC","LUAD",
 DPATH = '../data'
 Drug_info_file = '%s/GDSC/1.Drug_listMon Jun 24 09_00_55 2019.csv'%DPATH
 Cell_line_info_file = '%s/CCLE/Cell_lines_annotations_20181226.txt'%DPATH
-
-Drug_feature_file = '%s/GDSC/91 and 11'%DPATH
-Drug_feature_file_origin = '%s/GDSC/origin'%DPATH
-
+Drug_feature_file = '%s/GDSC/33 and 11'%DPATH
 Genomic_mutation_file = '%s/CCLE/genomic_mutation_34673_demap_features.csv'%DPATH
 Cancer_response_exp_file = '%s/CCLE/GDSC_IC50.csv'%DPATH
 Gene_expression_file = '%s/CCLE/genomic_expression_561celllines_697genes_demap_features.csv'%DPATH
 Methylation_file = '%s/CCLE/genomic_methylation_561celllines_808genes_demap_features.csv'%DPATH
 Max_atoms = 100
-batch_size_set=64
+batch_size_set=256
 epoch_set=500
 
-def MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Drug_feature_file_origin,Gene_expression_file,Methylation_file,filtered):
+def MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Gene_expression_file,Methylation_file,filtered):
     #drug_id --> pubchem_id
     reader = csv.reader(open(Drug_info_file,'r'))
     rows = [item for item in reader]
@@ -77,25 +73,12 @@ def MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Dr
     # load drug features
     drug_pubchem_id_set = []
     drug_feature = {}
-    res=0
-    res1=0
     for each in os.listdir(Drug_feature_file):
-        res+=1
         drug_pubchem_id_set.append(each.split('.')[0])
         node_features_Mol, lcq_adj, edges_feature = hkl.load('%s/%s'%(Drug_feature_file,each))
         drug_feature[each.split('.')[0]] = [node_features_Mol, lcq_adj, edges_feature]
     assert len(drug_pubchem_id_set)==len(drug_feature.values())
-
-    drug_pubchem_id_set_oriin = []
-    drug_feature_origin={}
-    for each_origin in os.listdir(Drug_feature_file_origin):
-        res1+=1
-        drug_pubchem_id_set_oriin.append(each_origin.split('.')[0])
-        feat_mat, adj_list, degree_list = hkl.load('%s/%s' % (Drug_feature_file_origin, each_origin))
-        drug_feature_origin[each_origin.split('.')[0]] = [feat_mat, adj_list, degree_list]
-
-    assert len(drug_pubchem_id_set)==len(drug_pubchem_id_set_oriin)
-
+    
     #load gene expression faetures
     gexpr_feature = pd.read_csv(Gene_expression_file,sep=',',header=0,index_col=[0])
     
@@ -121,7 +104,7 @@ def MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Dr
     nb_celllines = len(set([item[0] for item in data_idx]))
     nb_drugs = len(set([item[1] for item in data_idx]))
     print('%d instances across %d cell lines and %d drugs were generated.'%(len(data_idx),nb_celllines,nb_drugs))
-    return mutation_feature, drug_feature,drug_feature_origin,gexpr_feature,methylation_feature, data_idx
+    return mutation_feature, drug_feature,gexpr_feature,methylation_feature, data_idx
 
 #split into training and test set
 def DataSplit(data_idx,ratio=0.95):
@@ -134,57 +117,21 @@ def DataSplit(data_idx,ratio=0.95):
         data_test_idx += test_list
     assert len(data_test_idx)>=batch_size_set
     num= len(data_test_idx)//batch_size_set
-    data_test_idx=data_test_idx[:batch_size_set*num]
+    data_test_idx=data_test_idx[:batch_size_set*num]+data_test_idx[len(data_idx)-batch_size_set:]
     return data_train_idx,data_test_idx
-def NormalizeAdj(adj):
-    adj = adj + np.eye(adj.shape[0])
-    d = sp.diags(np.power(np.array(adj.sum(1)), -0.5).flatten(), 0).toarray()
-    a_norm = adj.dot(d).transpose().dot(d)
-    return a_norm
-def random_adjacency_matrix(n):
-    matrix = [[random.randint(0, 1) for i in range(n)] for j in range(n)]
-    # No vertex connects to itself
-    for i in range(n):
-        matrix[i][i] = 0
-    # If i is connected to j, j is connected to i
-    for i in range(n):
-        for j in range(n):
-            matrix[j][i] = matrix[i][j]
-    return matrix
-def CalculateGraphFeat(feat_mat,adj_list):
-    assert feat_mat.shape[0] == len(adj_list)
-    feat = np.zeros((Max_atoms,feat_mat.shape[-1]),dtype='float32')
-    adj_mat = np.zeros((Max_atoms,Max_atoms),dtype='float32')
-    if israndom:
-        feat = np.random.rand(Max_atoms,feat_mat.shape[-1])
-        adj_mat[feat_mat.shape[0]:,feat_mat.shape[0]:] = random_adjacency_matrix(Max_atoms-feat_mat.shape[0])
-    feat[:feat_mat.shape[0],:] = feat_mat
-    for i in range(len(adj_list)):
-        nodes = adj_list[i]
-        for each in nodes:
-            adj_mat[i,int(each)] = 1
-    assert np.allclose(adj_mat,adj_mat.T)
-    adj_ = adj_mat[:len(adj_list),:len(adj_list)]
-    adj_2 = adj_mat[len(adj_list):,len(adj_list):]
-    norm_adj_ = NormalizeAdj(adj_)
-    norm_adj_2 = NormalizeAdj(adj_2)
-    adj_mat[:len(adj_list),:len(adj_list)] = norm_adj_
-    adj_mat[len(adj_list):,len(adj_list):] = norm_adj_2
-    return [feat,adj_mat]
-def features_padding(node_feature,edges_feature,size):
-    node_feature= np.pad(node_feature,((0,Max_atoms-node_feature.shape[0]),(0,0)), 'constant')
-    edges_feature= np.pad(edges_feature,((0,Max_atoms-edges_feature.shape[0]),(0,Max_atoms-edges_feature.shape[0]),(0,0)), 'constant')
-    return [node_feature, edges_feature]
 
-def FeatureExtract(data_idx,drug_feature,drug_feature_origin,mutation_feature,gexpr_feature,methylation_feature):
+def features_padding(node_feature,edges_feature,size):
+    node_pad= np.pad(node_feature,((0,Max_atoms-node_feature.shape[0]),(0,0)), 'constant')
+    edge_pad= np.pad(edges_feature,((0,Max_atoms-edges_feature.shape[0]),(0,Max_atoms-edges_feature.shape[0]),(0,0)), 'constant')
+    return [node_pad, edge_pad]
+
+def FeatureExtract(data_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature):
     cancer_type_list = []
     nb_instance = len(data_idx)
     nb_mutation_feature = mutation_feature.shape[1]
     nb_gexpr_features = gexpr_feature.shape[1]
     nb_methylation_features = methylation_feature.shape[1]
     drug_data = [[] for item in range(nb_instance)]
-    drug_data_origin = [[] for item in range(nb_instance)]
-
     mutation_data = np.zeros((nb_instance,1, nb_mutation_feature,1),dtype='float32')
     gexpr_data = np.zeros((nb_instance,nb_gexpr_features),dtype='float32') 
     methylation_data = np.zeros((nb_instance, nb_methylation_features),dtype='float32') 
@@ -193,18 +140,15 @@ def FeatureExtract(data_idx,drug_feature,drug_feature_origin,mutation_feature,ge
         cell_line_id,pubchem_id,ln_IC50,cancer_type = data_idx[idx]
         #modify
         feat_mat,adj_list,_ = drug_feature[str(pubchem_id)]
-        feat_mat_origin,adj_list_origin,_ = drug_feature_origin[str(pubchem_id)]
         #fill drug data,padding to the same size with zeros
         drug_data[idx] = features_padding(feat_mat,adj_list,Max_atoms)
-        drug_data_origin[idx] = CalculateGraphFeat(feat_mat_origin,adj_list_origin)
-
         #randomlize X A
         mutation_data[idx,0,:,0] = mutation_feature.loc[cell_line_id].values
         gexpr_data[idx,:] = gexpr_feature.loc[cell_line_id].values
         methylation_data[idx,:] = methylation_feature.loc[cell_line_id].values
         target[idx] = ln_IC50
         cancer_type_list.append([cancer_type,cell_line_id,pubchem_id])
-    return drug_data,drug_data_origin,mutation_data,gexpr_data,methylation_data,target,cancer_type_list
+    return drug_data,mutation_data,gexpr_data,methylation_data,target,cancer_type_list
     
 
 
@@ -246,19 +190,24 @@ class MyCallback(Callback):
         return
         
 
-def ModelTraining(model,data_train_idx,drug_feature,drug_feature_origin,mutation_feature,gexpr_feature,methylation_feature,data_test_idx,validation_data,nb_epoch=epoch_set,batch_size=batch_size_set):
+def ModelTraining(model,data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature,data_test_idx,validation_data,nb_epoch=epoch_set,batch_size=batch_size_set):
     optimizer = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
     model.compile(optimizer = optimizer,loss='mean_squared_error',metrics=['mse'])
     #EarlyStopping(monitor='val_loss',patience=5)
     callbacks = [ModelCheckpoint('best_DeepCDR_%s.h5'%model_suffix,monitor='val_loss',save_best_only=False, save_weights_only=False),
                 MyCallback(validation_data=validation_data,patience=10)]
     #validation data
-    steps_per_epoch = len(data_train_idx) // batch_size
-    validation_steps = len(data_test_idx) //batch_size
-    training_generator=generate_batch_data(data_train_idx,batch_size=batch_size_set,drug_feature=drug_feature,drug_feature_origin=drug_feature_origin,mutation_feature=mutation_feature,gexpr_feature=gexpr_feature,methylation_feature=methylation_feature)
-    valid_generator=generate_batch_data(data_test_idx,batch_size=batch_size_set,drug_feature=drug_feature,drug_feature_origin=drug_feature_origin,mutation_feature=mutation_feature,gexpr_feature=gexpr_feature,methylation_feature=methylation_feature)
+    if len(data_train_idx) % batch_size_set == 0:
+        steps_per_epoch = len(data_train_idx) // batch_size_set
+    else:
+        steps_per_epoch = len(data_train_idx) // batch_size_set+1
+    if len(data_test_idx) % batch_size_set == 0:
+        validation_steps = len(data_test_idx) // batch_size_set
+    else:
+        validation_steps = len(data_test_idx) // batch_size_set+1
 
-    model.fit_generator(generator=training_generator,steps_per_epoch=steps_per_epoch,epochs=nb_epoch,verbose=1,callbacks=callbacks,validation_data=valid_generator,validation_steps=validation_steps,use_multiprocessing=True)
+    training_generator=generate_batch_data(data_train_idx,batch_size=batch_size_set,drug_feature=drug_feature,mutation_feature=mutation_feature,gexpr_feature=gexpr_feature,methylation_feature=methylation_feature)
+    model.fit_generator(generator=training_generator,steps_per_epoch=steps_per_epoch,epochs=nb_epoch,verbose=1,callbacks=callbacks,validation_data=validation_data,validation_steps=validation_steps,use_multiprocessing=True)
     # model.fit(x=[X_drug_feat_data_train,X_drug_adj_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train],y=Y_train,batch_size=1,epochs=nb_epoch,validation_split=0,callbacks=callbacks)
     return model
 
@@ -272,44 +221,45 @@ def ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,
     overall_pcc = pearsonr(Y_pred[:,0],Y_test)[0]
     print("The overall Pearson's correlation is %.4f."%overall_pcc)
 
-def generate_batch_data(data_idx,batch_size,drug_feature,drug_feature_origin,mutation_feature,gexpr_feature,methylation_feature):
+def generate_batch_data(data_idx,batch_size,drug_feature,mutation_feature,gexpr_feature,methylation_feature):
+    np.random.shuffle(data_idx)
     while True:
-        for step in range(len(data_idx) // batch_size):
-            present_idx = data_idx[step * batch_size:(step+1) * batch_size]
-            X_drug_data_train,X_drug_data_train_origin, X_mutation_data_train, X_gexpr_data_train, X_methylation_data_train, Y_train, cancer_type_train_list \
-                = FeatureExtract(present_idx, drug_feature,drug_feature_origin, mutation_feature, gexpr_feature, methylation_feature)
+
+        if len(data_idx) % batch_size == 0:
+            times_valid = len(data_idx) // batch_size
+        else:
+            times_valid = len(data_idx) // batch_size+1
+        for step_valid in range(times_valid):
+            if (step_valid+1) * batch_size > len(data_idx):
+                present_idx = data_idx[len(data_idx)-batch_size:]
+            else:
+                present_idx = data_idx[step_valid * batch_size:(step_valid+1) * batch_size]
+
+            X_drug_data_train, X_mutation_data_train, X_gexpr_data_train, X_methylation_data_train, Y_train, cancer_type_train_list \
+                = FeatureExtract(present_idx, drug_feature, mutation_feature, gexpr_feature, methylation_feature)
             X_drug_feat_data_train = [item[0] for item in X_drug_data_train]
             X_drug_adj_data_train = [item[1] for item in X_drug_data_train]
-            X_drug_feat_data_train_origin = [item[0] for item in X_drug_data_train_origin]
-            X_drug_adj_data_train_origin = [item[1] for item in X_drug_data_train_origin]
             X_drug_feat_data_train = np.array(X_drug_feat_data_train)#nb_instance * Max_stom * feat_dim
             X_drug_adj_data_train = np.array(X_drug_adj_data_train)#nb_instance * Max_stom * Max_stom
-            X_drug_feat_data_train_origin = np.array(X_drug_feat_data_train_origin)  # nb_instance * Max_stom * feat_dim
-            X_drug_adj_data_train_origin = np.array(X_drug_adj_data_train_origin)  # nb_instance * Max_stom * Max_stom
-            yield [X_drug_feat_data_train,X_drug_adj_data_train,X_drug_feat_data_train_origin,X_drug_adj_data_train_origin,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train], Y_train
+            yield [X_drug_feat_data_train,X_drug_adj_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train], Y_train
 
 def main():
     random.seed(0)
-    mutation_feature, drug_feature,drug_feature_origin,gexpr_feature,methylation_feature, data_idx = MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Drug_feature_file_origin,Gene_expression_file,Methylation_file,False)
+    mutation_feature, drug_feature,gexpr_feature,methylation_feature, data_idx = MetadataGenerate(Drug_info_file,Cell_line_info_file,Genomic_mutation_file,Drug_feature_file,Gene_expression_file,Methylation_file,False)
     #data_idx = data_idx[:100]
     data_train_idx,data_test_idx = DataSplit(data_idx)
     #Extract features for training and test
     # X_drug_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train,Y_train,cancer_type_train_list = FeatureExtract(data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature)
-    X_drug_data_test,X_drug_data_test_origin_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test,Y_test,cancer_type_test_list = FeatureExtract(data_test_idx,drug_feature,drug_feature_origin,mutation_feature,gexpr_feature,methylation_feature)
+    X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test,Y_test,cancer_type_test_list = FeatureExtract(data_test_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature)
     X_drug_feat_data_test = [item[0] for item in X_drug_data_test]
     X_drug_adj_data_test = [item[1] for item in X_drug_data_test]
-    X_drug_feat_data_test_origin = [item[0] for item in X_drug_data_test_origin_test]
-    X_drug_adj_data_test_origin = [item[1] for item in X_drug_data_test_origin_test]
     X_drug_feat_data_test = np.array(X_drug_feat_data_test)#nb_instance * Max_stom * feat_dim
     X_drug_adj_data_test = np.array(X_drug_adj_data_test)#nb_instance * Max_stom * Max_stom
-    X_drug_feat_data_test_origin = np.array(X_drug_feat_data_test_origin)  # nb_instance * Max_stom * feat_dim
-    X_drug_adj_data_test_origin = np.array(X_drug_adj_data_test_origin)  # nb_instance * Max_stom * Max_stom
-    validation_data = [[X_drug_feat_data_test,X_drug_adj_data_test,X_drug_feat_data_test_origin,X_drug_adj_data_test_origin,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test],Y_test]
-    model = KerasMultiSourceGCNModel(use_mut,use_gexp,use_methy).createMaster(X_drug_data_test[0][0].shape[-1],X_drug_data_test[0][1].shape[-1],X_drug_data_test_origin_test[0][0].shape[-1],X_mutation_data_test.shape[-2],X_gexpr_data_test.shape[-1],X_methylation_data_test.shape[-1],batch_size_set,args.unit_list,args.unit_edge_list,args.use_relu,args.use_bn,args.use_GMP)
-
-    # print(model.summary())
+    validation_data = [[X_drug_feat_data_test,X_drug_adj_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test],Y_test]
+    model = KerasMultiSourceGCNModel(use_mut,use_gexp,use_methy).createMaster(X_drug_data_test[0][0].shape[-1],X_drug_data_test[0][1].shape[-1],X_mutation_data_test.shape[-2],X_gexpr_data_test.shape[-1],X_methylation_data_test.shape[-1],batch_size_set,args.unit_list,args.unit_edge_list,args.use_relu,args.use_bn,args.use_GMP)
+    print(model.summary())
     print('Begin training...')
-    model = ModelTraining(model,data_train_idx,drug_feature,drug_feature_origin,mutation_feature,gexpr_feature,methylation_feature,data_test_idx,validation_data,nb_epoch=epoch_set,batch_size=batch_size_set)
+    model = ModelTraining(model,data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature,data_test_idx,validation_data,nb_epoch=epoch_set,batch_size=batch_size_set)
     ModelEvaluate(model,X_drug_data_test,X_mutation_data_test,X_gexpr_data_test,X_methylation_data_test,Y_test,cancer_type_test_list,'%s/DeepCDR_%s.log'%(DPATH,model_suffix))
 
 if __name__=='__main__':
