@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="lcq@10.101.4.37:22" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lcq@10.101.4.37:22 (12)" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="lcq@10.101.33.2:22">
         <serverdata>
@@ -23,6 +23,13 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="lcq@10.101.33.2:22 (4)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="lcq@10.101.33.2:22 (6)">
         <serverdata>
           <mappings>
@@ -34,6 +41,83 @@
         <serverdata>
           <mappings>
             <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (10)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (11)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (12)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/test" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (2)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (3)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (4)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (5)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (6)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (7)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR_LCQ" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (8)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR-master" local="$USER_HOME$/Desktop/DeepCDR-master" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lcq@10.101.4.37:22 (9)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lcq/DeepCDR-master" local="$USER_HOME$/Desktop/DeepCDR-master" />
           </mappings>
         </serverdata>
       </paths>

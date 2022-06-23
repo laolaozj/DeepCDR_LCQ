@@ -13,15 +13,21 @@ if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 molecules = []
 for each in pubchemid2smile.keys():
-	print(each)
 	molecules=[]
 	molecules.append(Chem.MolFromSmiles(pubchemid2smile[each]))
-	featurizer = dc.feat.graph_features.ConvMolFeaturizer()
-	mol_object = featurizer.featurize(mols=molecules)
-	features = mol_object[0].atom_features
-	degree_list = mol_object[0].deg_list
-	adj_list = mol_object[0].canon_adj_list
-	hkl.dump([features,adj_list,degree_list],'%s/%s.hkl'%(save_dir,each))
+
+	# featurizer = dc.feat.graph_features.ConvMolFeaturizer()
+	# mol_object = featurizer.featurize(mols=molecules)
+	# features = mol_object[0].atom_features
+	# degree_list = mol_object[0].deg_list
+	# adj_list = mol_object[0].canon_adj_list
+
+	graph_featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True, use_chirality=True, use_partial_charge=True)
+	graph_mols = graph_featurizer.featurize(molecules)
+
+	node_features = graph_mols[0].node_features
+	print(node_features.shape)
+#hkl.dump([features,adj_list,degree_list],'%s/%s.hkl'%(save_dir,each))
 
 
 

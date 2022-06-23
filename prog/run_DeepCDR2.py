@@ -15,7 +15,7 @@ import argparse
 
 ####################################Settings#################################
 parser = argparse.ArgumentParser(description='Drug_response_pre')
-parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='3', help='GPU devices')
+parser.add_argument('-gpu_id', dest='gpu_id', type=str, default='2', help='GPU devices')
 parser.add_argument('-use_mut', dest='use_mut', type=bool, default=True, help='use gene mutation or not')
 parser.add_argument('-use_gexp', dest='use_gexp', type=bool, default=True, help='use gene expression or not')
 parser.add_argument('-use_methy', dest='use_methy', type=bool, default=True, help='use methylation or not')
@@ -32,7 +32,7 @@ parser.add_argument('-Max_atoms', dest='Max_atoms', type=int, default=100, help=
 parser.add_argument('-batch_size_set', dest='batch_size_set', type=int, default=256, help='batch_size_set')
 parser.add_argument('-epoch_set', dest='epoch_set', type=int, default=500, help='max epoch')
 
-parser.add_argument('-Dropout_rate', dest='Dropout_rate', type=float, default=0.2, help='Dropout_rate')
+parser.add_argument('-Dropout_rate', dest='Dropout_rate', type=float, default=0.1, help='Dropout_rate')
 parser.add_argument('-activation', dest='activation', type=str, default='relu', help='activation func')
 
 parser.add_argument('-use_bn', dest='use_bn', type=bool, default=True, help='use batchnormalization for GCN')
@@ -258,8 +258,8 @@ def ModelEvaluate(model, X_drug_data_test, X_mutation_data_test, X_gexpr_data_te
         batch_size=args.batch_size_set)
     overall_pcc = pearsonr(Y_pred[:, 0], Y_test)[0]
     print("The overall Pearson's correlation is %.4f." % overall_pcc)
-    with open('result0.1tf2.log', 'a') as f:
-        f.write(str(overall_pcc)+" overall_pcc"+"0.1 tf2\n")
+    with open('result0.2tf2.log', 'a') as f:
+        f.write(str(overall_pcc)+" overall_pcc"+"0.2 tf2\n")
 
 
 def generate_batch_data(data_idx, batch_size, drug_feature, mutation_feature, gexpr_feature, methylation_feature):

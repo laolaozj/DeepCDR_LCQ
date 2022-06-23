@@ -1,20 +1,20 @@
 from __future__ import print_function
-
-from keras import activations, initializers, constraints
-from keras import regularizers
-from keras.engine import Layer
-from  keras.backend.tensorflow_backend import clip
+#
+# from keras import activations, initializers, constraints
+# from keras import regularizers
+# from keras.engine import Layer
+# from  keras.backend.tensorflow_backend import clip
+# import tensorflow as tf
+from tensorflow.keras import backend as K
+# import numpy as np
+# from keras.layers import  Reshape
+import tensorflow.keras
 import tensorflow as tf
-from keras import backend as K
-import numpy as np
-from keras.layers import  Reshape
-import keras
-import tensorflow as tf
-from keras.layers import Dense,Activation,Dropout,Flatten,Concatenate
-from keras.layers import BatchNormalization
+# from keras.layers import Dense,Activation,Dropout,Flatten,Concatenate
+# from keras.layers import BatchNormalization
 
 
-class GraphConvTest(keras.layers.Layer):
+class GraphConvTest(tensorflow.keras.layers.Layer):
 
     def __init__(self,
                  units,
@@ -33,10 +33,21 @@ class GraphConvTest(keras.layers.Layer):
         self.units_edge = units_edge
         self.step = step
         self.use_bias = use_bias
-        self.activation = keras.activations.get('tanh')
+        self.activation = tensorflow.keras.activations.get('tanh')
         self.update_edge = update_edge
         super(GraphConvTest, self).__init__(**kwargs)
 
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({
+            'units': self.units,
+            'units_edge': self.units_edge,
+            'step': self.step,
+            'use_bias': self.use_bias,
+            'activation': self.activation,
+            'update_edge': self.update_edge,
+        })
+        return config
 
     def build(self, input_shape):
         feature_dim = input_shape[0][2]
@@ -132,40 +143,34 @@ class GraphConvTest(keras.layers.Layer):
         # if self.bn:
         #     output = self.mol_bn2(output.reshape(-1, self.out_features)).reshape(m1, m2, self.out_features)
         #output = output * mask
-        print(output.shape,"final outputshape")
+
 
         if self.update_edge:
             tadj = K.concatenate([K.expand_dims(output,1) * K.ones([1, a2, 1, 1]),
                                 K.expand_dims(output,2) * K.ones([1, 1, a3, 1])], 3)
             # tadj = self.relu(self.adj_linear(tadj))
-            print(tadj.shape, " tadj")
             tadj = K.dot(tadj, self.adj_linear_W)
-            print(tadj.shape, " tadj")
             if self.use_bias:
                 tadj += self.adj_linear_b
             tadj=K.relu(tadj)
 
             tadj=K.concatenate([tadj,K.permute_dimensions(lcq_adj,(0,2,3,1))],3)
-            print(tadj.shape, " tadj")
 
             # tadj = K.concatenate([tadj, lcq_adj.permute(0, 2, 3, 1)], 3)
             _adj = lcq_adj
 
             # adj = self.relu(self.adj_out_linear(tadj))
             adj = K.dot(tadj, self.adj_out_linear_W)
-            print(adj.shape, " tadj")
 
             if self.use_bias:
                 adj += self.adj_out_linear_b
             adj=K.relu(adj)
             #adj = adj * adjmask
-            print(adj.shape, " ??")
             # print(_adj.shape, " ??")
             # adj=K.permute_dimensions(adj,(0,3,1,2,))+_adj
             # print(adj.shape, " ??")
             #
             # adj=tf.transpose(adj,(0,2,3,1))
-            print(adj.shape,"adjfinalshape")
             return [output, adj]
         else:
             lcq_adj=tf.transpose(lcq_adj,(0,2,3,1))

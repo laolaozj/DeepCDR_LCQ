@@ -128,33 +128,42 @@ def _construct_atom_feature(
     A one-hot vector of the atom feature.
     44+1+5+2+1+12+6+8+7+1+1+2+1 = 91 features
   """
-  atom_type = get_atom_type_one_hot(atom,USER_ATOM_TYPE_SET,include_unknown_set = True)
-  formal_charge = get_atom_formal_charge(atom)
-  hybridization = get_atom_hybridization_one_hot(atom,USER_HYBRIDIZATION_SET,include_unknown_set = False)
-  acceptor_donor = get_atom_hydrogen_bonding_one_hot(atom, h_bond_infos)
-  aromatic = get_atom_is_in_aromatic_one_hot(atom)
-  degree = get_atom_total_degree_one_hot(atom,USER_TOTAL_DEGREE_SET,include_unknown_set = True)
+
+  # atom_type = get_atom_type_one_hot(atom,USER_ATOM_TYPE_SET,include_unknown_set = True)
+  atom_type = get_atom_type_one_hot(atom,include_unknown_set = True)#44
+
+  formal_charge = get_atom_formal_charge(atom)#1
+  # hybridization = get_atom_hybridization_one_hot(atom,USER_HYBRIDIZATION_SET,include_unknown_set = False)#5
+  hybridization = get_atom_hybridization_one_hot(atom,include_unknown_set = False)#2
+
+  acceptor_donor = get_atom_hydrogen_bonding_one_hot(atom, h_bond_infos)#1
+  aromatic = get_atom_is_in_aromatic_one_hot(atom)#12
+  # degree = get_atom_total_degree_one_hot(atom,USER_TOTAL_DEGREE_SET,include_unknown_set = True)#6
+  degree = get_atom_total_degree_one_hot(atom,include_unknown_set = True)
+
   total_num_Hs = get_atom_total_num_Hs_one_hot(atom,DEFAULT_TOTAL_NUM_Hs_SET,include_unknown_set = True)
   atom_feat = np.concatenate([
       atom_type, formal_charge, hybridization, acceptor_donor, aromatic, degree,
       total_num_Hs
   ])
 
-  ### user additional features ####
+
+  ## user additional features ####
   if True:
     imp_valence = get_atom_implicit_valence_one_hot(atom,DEFAULT_ATOM_IMPLICIT_VALENCE_SET,include_unknown_set=True)
     exp_valence = get_atom_explicit_valence_one_hot(atom,DEFAULT_ATOM_EXPLICIT_VALENCE_SET,include_unknown_set=True)
     atom_feat = np.concatenate([atom_feat,imp_valence,exp_valence,[atom.HasProp('_ChiralityPossible'), atom.GetNumRadicalElectrons()],])
-  ###########    END    ############
+  ##########    END    ############     #17
+
 
   if use_chirality:
-    # chirality = get_atom_chirality_one_hot(atom) 
-    chirality = get_atom_chirality_one_hot(atom) 
-    atom_feat = np.concatenate([atom_feat, np.array(chirality)])
+    # chirality = get_atom_chirality_one_hot(atom)
+    chirality = get_atom_chirality_one_hot(atom)
+    atom_feat = np.concatenate([atom_feat, np.array(chirality)])       #2
 
   if use_partial_charge:
     partial_charge = get_atom_partial_charge(atom)
-    atom_feat = np.concatenate([atom_feat, np.array(partial_charge)])
+    atom_feat = np.concatenate([atom_feat, np.array(partial_charge)])  #1
   return atom_feat
 
 
@@ -327,7 +336,7 @@ if __name__  == '__main__':
     # print('edge_index', graph_mols[0].edge_index.shape)\
 
     drug_smiles_file = '../data/223drugs_pubchem_smiles.txt'
-    save_dir = '../data/GDSC/drug_graph_featnode adjedge adj'
+    save_dir = '../data/GDSC/50 and 11'
     pubchemid2smile = {item.split('\t')[0]: item.split('\t')[1].strip() for item in open(drug_smiles_file).readlines()}
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -352,11 +361,9 @@ if __name__  == '__main__':
             adj_np[edges_index[0][i]][edges_index[1][i]] = edges_attr2[index]
             adj_np_01[edges_index[0][i]][edges_index[1][i]] = 1
             index += 1
-
+        # print(node_features.shape,"node")
+        # break
         hkl.dump([node_features, adj_np, adj_np_01], '%s/%s.hkl' % (save_dir, each))
-
-
-
 
 
 
