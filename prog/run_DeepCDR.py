@@ -29,7 +29,7 @@ parser.add_argument('-unit_edge_list', dest='unit_edge_list', nargs='+', type=in
                     help='unit list for edge GCN')
 
 parser.add_argument('-Max_atoms', dest='Max_atoms', type=int, default=100, help='molecule padding size')
-parser.add_argument('-batch_size_set', dest='batch_size_set', type=int, default=256, help='batch_size_set')
+parser.add_argument('-batch_size_set', dest='batch_size_set', type=int, default=2, help='batch_size_set')
 parser.add_argument('-epoch_set', dest='epoch_set', type=int, default=500, help='max epoch')
 
 parser.add_argument('-Dropout_rate', dest='Dropout_rate', type=float, default=0.2, help='Dropout_rate')
@@ -295,7 +295,7 @@ def main():
                                                                                                     Gene_expression_file,
                                                                                                     Methylation_file,
                                                                                                     False)
-    #data_idx = data_idx[:100]
+    data_idx = data_idx[:100]
     data_train_idx, data_test_idx = DataSplit(data_idx)
     # Extract features for training and test
     # X_drug_data_train,X_mutation_data_train,X_gexpr_data_train,X_methylation_data_train,Y_train,cancer_type_train_list = FeatureExtract(data_train_idx,drug_feature,mutation_feature,gexpr_feature,methylation_feature)
@@ -323,7 +323,7 @@ def main():
                           data_test_idx, validation_data, nb_epoch=args.epoch_set, batch_size=args.batch_size_set)
     ModelEvaluate(model, X_drug_data_test, X_mutation_data_test, X_gexpr_data_test, X_methylation_data_test, Y_test,
                   cancer_type_test_list, '%s/DeepCDR_%s.log' % (DPATH, model_suffix))
-
+    #
 
 if __name__ == '__main__':
     main()
